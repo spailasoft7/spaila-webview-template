@@ -2,9 +2,7 @@ package com.spaila.webview;
 
 import android.Manifest;
 import android.app.Activity;
-import android.app.Notification;
-import android.app.NotificationChannel;
-import android.app.NotificationManager;
+import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -34,12 +32,11 @@ import java.util.Set;
 public class MainActivity extends Activity {
 
     private static final String ORIGIN = "https://appassets.androidplatform.net";
-    private static final String CHANNEL_ID = "spaila_default";
+    private static final String START_PAGE = "bridge-test.html";
     private static final int REQ_NOTIFICATIONS = 1001;
 
     private WebView webView;
-    private String pendingTitle;
-    private String pendingMessage;
+    private Runnable pendingAction;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -96,7 +93,7 @@ public class MainActivity extends Activity {
 
         setupSpailaBridge();
 
-        webView.loadUrl(ORIGIN + "/assets/www/index.html");
+        webView.loadUrl(ORIGIN + "/assets/www/" + START_PAGE);
     }
 
     private void openInBrowser(Uri uri) {
@@ -131,67 +128,78 @@ public class MainActivity extends Activity {
 
             if (fn.equals("toast")) {
                 Toast.makeText(this, args.getString(0), Toast.LENGTH_SHORT).show();
+
             } else if (fn.equals("showNotification")) {
-                showNotification(args.getString(0), args.getString(1));
+                final String title = args.getString(0);
+                final String text = args.getString(1);
+                withNotificationPermission(() -> NotificationHelper.show(this, title, text));
+
+            } else if (fn.equals("scheduleNotification")) {
+                final int id = args.getInt(0);
+                final String title = args.getString(1);
+                final String text = args.getString(2);
+                final long seconds = args.getLong(3);
+                withNotificationPermission(() -> scheduleNotification(id, title, text, seconds));
+
+            } else if (fn.equals("cancelScheduledNotification")) {
+                cancelScheduledNotification(args.getInt(0));
             }
         } catch (Exception e) {
             // Ignore bad messages for now
         }
     }
 
-    // ---------- Notifications ----------
+    // ---------- Notification permission ----------
 
-    private void showNotification(String title, String message) {
+    // Runs the action now if allowed, otherwise asks first and runs it if the user says yes.
+    private void withNotificationPermission(Runnable action) {
         if (Build.VERSION.SDK_INT >= 33
                 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED) {
-            pendingTitle = title;
-            pendingMessage = message;
+            pendingAction = action;
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQ_NOTIFICATIONS);
             return;
         }
-        postNotification(title, message);
+        action.run();
     }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == REQ_NOTIFICATIONS) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                if (pendingTitle != null) {
-                    postNotification(pendingTitle, pendingMessage);
-                }
-            } else {
+            boolean granted = grantResults.length > 0
+                    && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+            if (granted && pendingAction != null) {
+                pendingAction.run();
+            } else if (!granted) {
                 Toast.makeText(this, "Notifications are turned off for this app", Toast.LENGTH_LONG).show();
             }
-            pendingTitle = null;
-            pendingMessage = null;
+            pendingAction = null;
         }
     }
 
-    private void postNotification(String title, String message) {
-        NotificationManager manager = getSystemService(NotificationManager.class);
+    // ---------- Scheduled notifications ----------
 
-        if (Build.VERSION.SDK_INT >= 26) {
-            NotificationChannel channel = new NotificationChannel(
-                    CHANNEL_ID, "Spaila notifications", NotificationManager.IMPORTANCE_DEFAULT);
-            manager.createNotificationChannel(channel);
+    private PendingIntent alarmIntent(int id, String title, String message, int flags) {
+        Intent intent = new Intent(this, AlarmReceiver.class);
+        intent.putExtra("title", title);
+        intent.putExtra("message", message);
+        return PendingIntent.getBroadcast(this, id, intent, flags | PendingIntent.FLAG_IMMUTABLE);
+    }
+
+    private void scheduleNotification(int id, String title, String message, long seconds) {
+        AlarmManager alarmManager = getSystemService(AlarmManager.class);
+        PendingIntent pending = alarmIntent(id, title, message, PendingIntent.FLAG_UPDATE_CURRENT);
+        long triggerAt = System.currentTimeMillis() + seconds * 1000L;
+        alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pending);
+    }
+
+    private void cancelScheduledNotification(int id) {
+        AlarmManager alarmManager = getSystemService(AlarmManager.class);
+        PendingIntent pending = alarmIntent(id, "", "", PendingIntent.FLAG_NO_CREATE);
+        if (pending != null) {
+            alarmManager.cancel(pending);
+            pending.cancel();
         }
-
-        Intent openApp = new Intent(this, MainActivity.class);
-        PendingIntent tapAction = PendingIntent.getActivity(
-                this, 0, openApp, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
-
-        Notification.Builder builder = (Build.VERSION.SDK_INT >= 26)
-                ? new Notification.Builder(this, CHANNEL_ID)
-                : new Notification.Builder(this);
-
-        builder.setSmallIcon(android.R.drawable.ic_dialog_info)
-                .setContentTitle(title)
-                .setContentText(message)
-                .setContentIntent(tapAction)
-                .setAutoCancel(true);
-
-        manager.notify((int) System.currentTimeMillis(), builder.build());
     }
 }

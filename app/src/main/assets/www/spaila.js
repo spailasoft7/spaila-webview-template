@@ -14,6 +14,15 @@
     },
     showNotification: function (title, message) {
       send("showNotification", [String(title), String(message)]);
+    },
+    // id: a whole number you choose. Using the same id again replaces the old one.
+    scheduleNotification: function (id, title, message, seconds) {
+      send("scheduleNotification", [
+        Math.round(Number(id)), String(title), String(message), Math.round(Number(seconds))
+      ]);
+    },
+    cancelScheduledNotification: function (id) {
+      send("cancelScheduledNotification", [Math.round(Number(id))]);
     }
   };
 })();
