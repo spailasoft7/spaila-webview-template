@@ -1,0 +1,1160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Later</title>
+<link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<div class="app">
+
+  <!-- HOME -->
+  <section id="home" class="screen active">
+
+    <header>
+      <div>
+        <div class="brand">Later</div>
+        <div class="subtitle" id="homeSubtitle">
+          One thing at a time 😎
+        </div>
+      </div>
+    </header>
+
+    <div class="card hero">
+
+      <h1 id="homeTitle">
+        What are we fighting today? 😤
+      </h1>
+
+      <p id="homeDescription">
+        Pick a task. We'll keep it simple.
+      </p>
+
+      <textarea
+        id="taskInput"
+        placeholder="e.g. Maths homework"
+      ></textarea>
+
+      <div style="height:16px"></div>
+
+      <label>How are we feeling?</label>
+
+      <div class="mode-grid">
+
+        <button
+          class="mode selected"
+          id="notExcitedBtn"
+          onclick="selectMode('countdown')"
+        >
+          <strong>😐 Not really</strong>
+          <span>Just give me 5 minutes.</span>
+        </button>
+
+        <button
+          class="mode"
+          id="excitedBtn"
+          onclick="selectMode('stopwatch')"
+        >
+          <strong>🔥 Let's go</strong>
+          <span>Let's see how long we go.</span>
+        </button>
+
+      </div>
+
+      <button
+        class="primary"
+        onclick="startWork()"
+      >
+        Let's do this 
+      </button>
+
+    </div>
+
+    <div class="section-title">
+
+      <h2>Parked for Later 📦</h2>
+
+      <span id="noteCount">
+        0 notes
+      </span>
+
+    </div>
+
+    <div id="notes" class="notes"></div>
+
+  </section>
+
+
+  <!-- WORK -->
+  <section id="work" class="screen">
+
+    <header>
+
+      <button
+        class="icon-btn"
+        onclick="goHome()"
+      >
+        ←
+      </button>
+
+      <div style="text-align:right">
+
+        <div
+          class="brand"
+          style="font-size:24px"
+        >
+          Later
+        </div>
+
+        <div class="subtitle">
+          You are here. Keep going 😎
+        </div>
+
+      </div>
+
+    </header>
+
+
+    <div class="card timer">
+
+      <div
+        class="timer-title"
+        id="timerTask"
+      >
+        Your task
+      </div>
+
+      <div
+        class="time"
+        id="timeDisplay"
+      >
+        05:00
+      </div>
+
+      <div
+        class="timer-status"
+        id="timerStatus"
+      >
+        Ready
+      </div>
+
+      <div class="timer-actions">
+
+        <button
+          class="secondary"
+          id="pauseBtn"
+          onclick="togglePause()"
+        >
+          Pause
+        </button>
+
+        <button
+          class="primary"
+          onclick="finishWork()"
+        >
+          I'm done 
+        </button>
+
+      </div>
+
+    </div>
+
+
+    <div class="card">
+
+      <label>
+        Something distracting you? 👀
+      </label>
+
+      <textarea
+        id="distractionInput"
+        placeholder="Game, video, friend, random idea..."
+      ></textarea>
+
+      <button
+        class="primary"
+        onclick="saveDistraction()"
+      >
+        Park it 📦
+      </button>
+
+    </div>
+
+
+    <div class="card">
+
+      <strong id="reminderTitle">
+        Tiny reminder
+      </strong>
+
+      <p
+        id="reminderText"
+        style="color:#60708b;line-height:1.45;margin-bottom:0"
+      >
+        You don't need to feel ready. Just start.
+      </p>
+
+    </div>
+
+  </section>
+
+</div>
+
+
+<div
+  id="toast"
+  class="toast"
+></div>
+
+
+<script>
+
+/* ==============================
+   STORAGE
+============================== */
+
+const NOTES_KEY = "later_notes_v3";
+
+
+/* ==============================
+   STATE
+============================== */
+
+let mode = "countdown";
+
+let timerId = null;
+
+let timerRunning = false;
+
+let timerPaused = false;
+
+let startTimestamp = 0;
+
+let pauseStarted = 0;
+
+let pausedTotal = 0;
+
+let countdownEnd = 0;
+
+let currentTask = "";
+
+let appWasHidden = false;
+
+
+/* ==============================
+   HELPERS
+============================== */
+
+const $ = id =>
+  document.getElementById(id);
+
+
+function getNotes(){
+
+  try{
+
+    return JSON.parse(
+      localStorage.getItem(NOTES_KEY)
+    ) || [];
+
+  }catch(e){
+
+    return [];
+
+  }
+}
+
+
+function saveNotes(notes){
+
+  localStorage.setItem(
+    NOTES_KEY,
+    JSON.stringify(notes)
+  );
+
+}
+
+
+function escapeHTML(value){
+
+  return String(value).replace(
+    /[&<>"']/g,
+    character => ({
+      "&":"&amp;",
+      "<":"&lt;",
+      ">":"&gt;",
+      '"':"&quot;",
+      "'":"&#039;"
+    }[character])
+  );
+
+}
+
+
+function isURL(text){
+
+  return /^https?:\/\/\S+$/i
+    .test(text.trim());
+
+}
+
+
+function randomItem(array){
+
+  return array[
+    Math.floor(
+      Math.random() * array.length
+    )
+  ];
+
+}
+
+
+/* ==============================
+   APP DIALOGUE
+============================== */
+
+const homeTitles = [
+  "What are we fighting today? ",
+  "What's the mission today? 👀",
+  "Alright… what are we doing?",
+  "What's on the hit list? ",
+  "What are we tackling today?"
+];
+
+
+const homeDescriptions = [
+  "Pick a task. We'll keep it simple.",
+  "One task. No drama.",
+  "Let's make this thing happen.",
+  "Small start. Big win.",
+  "No need to overthink it."
+];
+
+
+const taskPlaceholders = [
+  "e.g. Maths homework",
+  "e.g. Study for tomorrow",
+  "e.g. Finish my assignment",
+  "e.g. Clean my room",
+  "e.g. That thing I keep avoiding"
+];
+
+
+const reminderTexts = [
+  "You don't need to feel ready. Just start.",
+  "One little step. That's enough.",
+  "Don't think too much. Just keep going.",
+  "Future you will be happy you started.",
+  "We're not trying to be perfect 😎"
+];
+
+
+const timerLabels = [
+  "Keep going 😎",
+  "You got this.",
+  "One step at a time.",
+  "Don't run away 😂",
+  "We're cooking 🔥",
+  "Stay with it."
+];
+
+
+const doneMessages = [
+  "Boom. Done. 🚀",
+  "Nice work 😎",
+  "You actually did it 😂",
+  "Mission complete.",
+  "That's one less thing.",
+  "Look at you go."
+];
+
+
+const parkedMessages = [
+  "Parked for later 📦",
+  "Saved. Future you can deal with it 😎",
+  "Okay, that's in the Later box.",
+  "Noted. Back to work.",
+  "Parked. Now let's keep going."
+];
+
+
+const backgroundMessages = [
+  "Hey, you're back 👀",
+  "Welcome back 😎",
+  "There you are.",
+  "Back to the mission 🚀",
+  "We didn't forget the task 😂"
+];
+
+
+const fiveMinuteMessages = [
+  "Five minutes done. Nice start 😎",
+  "That was five minutes already 👀",
+  "Round one is done.",
+  "You survived five minutes 😂",
+  "Nice. Want another round?"
+];
+
+
+/* ==============================
+   INITIAL UI
+============================== */
+
+$("homeTitle").textContent =
+  randomItem(homeTitles);
+
+$("homeDescription").textContent =
+  randomItem(homeDescriptions);
+
+$("taskInput").placeholder =
+  randomItem(taskPlaceholders);
+
+$("reminderText").textContent =
+  randomItem(reminderTexts);
+
+renderNotes();
+
+
+/* ==============================
+   MODE
+============================== */
+
+function selectMode(newMode){
+
+  mode = newMode;
+
+  $("notExcitedBtn")
+    .classList.toggle(
+      "selected",
+      mode === "countdown"
+    );
+
+  $("excitedBtn")
+    .classList.toggle(
+      "selected",
+      mode === "stopwatch"
+    );
+
+}
+
+
+/* ==============================
+   SCREEN
+============================== */
+
+function showScreen(id){
+
+  document
+    .querySelectorAll(".screen")
+    .forEach(screen =>
+      screen.classList.remove("active")
+    );
+
+  $(id).classList.add("active");
+
+}
+
+
+/* ==============================
+   NATIVE ANDROID NOTIFICATION
+============================== */
+
+function sendNativeNotification(
+  title,
+  message
+){
+
+  try{
+
+    if(
+      window.AndroidAPI &&
+      typeof AndroidAPI.showNotification === "function"
+    ){
+
+      AndroidAPI.showNotification(
+        title,
+        message
+      );
+
+    }
+
+  }catch(error){
+
+    console.log(
+      "Android notification unavailable:",
+      error
+    );
+
+  }
+
+}
+
+
+/* ==============================
+   START WORK
+============================== */
+
+function startWork(){
+
+  const task =
+    $("taskInput")
+      .value
+      .trim();
+
+  if(!task){
+
+    $("taskInput").focus();
+
+    toast(
+      "Give me a task first 😂"
+    );
+
+    return;
+
+  }
+
+  currentTask = task;
+
+  $("timerTask").textContent =
+    currentTask;
+
+  $("pauseBtn").textContent =
+    "Pause";
+
+  timerPaused = false;
+
+  pauseStarted = 0;
+
+  pausedTotal = 0;
+
+  startTimestamp =
+    Date.now();
+
+  timerRunning = true;
+
+  if(mode === "countdown"){
+
+    countdownEnd =
+      Date.now() +
+      5 * 60 * 1000;
+
+    $("timerStatus").textContent =
+      "Just 5 minutes. Let's go.";
+
+  }else{
+
+    $("timerStatus").textContent =
+      "Stopwatch running.";
+
+  }
+
+  showScreen("work");
+
+  updateTimer();
+
+  clearInterval(timerId);
+
+  timerId =
+    setInterval(
+      updateTimer,
+      250
+    );
+
+  sendNativeNotification(
+    "Later",
+    "Time to work on " + currentTask
+  );
+
+}
+
+
+/* ==============================
+   TIMER
+============================== */
+
+function updateTimer(){
+
+  if(!timerRunning) return;
+
+  if(timerPaused){
+
+    renderPausedTime();
+
+    return;
+
+  }
+
+  const now =
+    Date.now();
+
+  if(mode === "countdown"){
+
+    const remaining =
+      Math.max(
+        0,
+        countdownEnd - now
+      );
+
+    $("timeDisplay").textContent =
+      formatTime(remaining);
+
+    if(remaining <= 0){
+
+      clearInterval(timerId);
+
+      timerRunning = false;
+
+      $("timerStatus").textContent =
+        randomItem(
+          fiveMinuteMessages
+        );
+
+      $("pauseBtn").textContent =
+        "Start again";
+
+      sendNativeNotification(
+        "Later",
+        "Your 5 minutes are done."
+      );
+
+      toast(
+        "Five minutes done 😎"
+      );
+
+    }
+
+  }else{
+
+    const elapsed =
+      Math.max(
+        0,
+        now -
+        startTimestamp -
+        pausedTotal
+      );
+
+    $("timeDisplay").textContent =
+      formatTime(elapsed);
+
+  }
+
+}
+
+
+function renderPausedTime(){
+
+  const now =
+    pauseStarted ||
+    Date.now();
+
+  if(mode === "countdown"){
+
+    const remaining =
+      Math.max(
+        0,
+        countdownEnd - now
+      );
+
+    $("timeDisplay").textContent =
+      formatTime(remaining);
+
+  }else{
+
+    const elapsed =
+      Math.max(
+        0,
+        now -
+        startTimestamp -
+        pausedTotal
+      );
+
+    $("timeDisplay").textContent =
+      formatTime(elapsed);
+
+  }
+
+}
+
+
+function formatTime(ms){
+
+  const totalSeconds =
+    Math.floor(ms / 1000);
+
+  const hours =
+    Math.floor(
+      totalSeconds / 3600
+    );
+
+  const minutes =
+    Math.floor(
+      (totalSeconds % 3600) / 60
+    );
+
+  const seconds =
+    totalSeconds % 60;
+
+  if(hours > 0){
+
+    return (
+      String(hours).padStart(2,"0")
+      + ":" +
+      String(minutes).padStart(2,"0")
+      + ":" +
+      String(seconds).padStart(2,"0")
+    );
+
+  }
+
+  return (
+    String(minutes).padStart(2,"0")
+    + ":" +
+    String(seconds).padStart(2,"0")
+  );
+
+}
+
+
+/* ==============================
+   PAUSE
+============================== */
+
+function togglePause(){
+
+  if(
+    !timerRunning &&
+    mode === "countdown"
+  ){
+
+    startTimestamp =
+      Date.now();
+
+    countdownEnd =
+      Date.now() +
+      5 * 60 * 1000;
+
+    timerRunning = true;
+
+    timerPaused = false;
+
+    $("pauseBtn").textContent =
+      "Pause";
+
+    $("timerStatus").textContent =
+      "Five minutes. Let's go.";
+
+    clearInterval(timerId);
+
+    timerId =
+      setInterval(
+        updateTimer,
+        250
+      );
+
+    return;
+
+  }
+
+
+  if(!timerPaused){
+
+    timerPaused = true;
+
+    pauseStarted =
+      Date.now();
+
+    $("pauseBtn").textContent =
+      "Resume";
+
+    $("timerStatus").textContent =
+      "Paused 😌";
+
+  }else{
+
+    pausedTotal +=
+      Date.now() -
+      pauseStarted;
+
+    pauseStarted = 0;
+
+    timerPaused = false;
+
+    $("pauseBtn").textContent =
+      "Pause";
+
+    $("timerStatus").textContent =
+      mode === "countdown"
+        ? "Keep going."
+        : "Stopwatch running.";
+
+  }
+
+}
+
+
+/* ==============================
+   FINISH
+============================== */
+
+function finishWork(){
+
+  clearInterval(timerId);
+
+  timerRunning = false;
+
+  timerPaused = false;
+
+  $("timerStatus").textContent =
+    "Nice work.";
+
+  toast(
+    randomItem(doneMessages)
+  );
+
+  setTimeout(() => {
+
+    $("distractionInput").value = "";
+
+    $("homeTitle").textContent =
+      randomItem(homeTitles);
+
+    $("homeDescription").textContent =
+      randomItem(homeDescriptions);
+
+    $("taskInput").placeholder =
+      randomItem(taskPlaceholders);
+
+    showScreen("home");
+
+  },650);
+
+}
+
+
+/* ==============================
+   DISTRACTION
+============================== */
+
+function saveDistraction(){
+
+  const text =
+    $("distractionInput")
+      .value
+      .trim();
+
+  if(!text){
+
+    $("distractionInput").focus();
+
+    toast(
+      "Write the distraction first 👀"
+    );
+
+    return;
+
+  }
+
+  const notes =
+    getNotes();
+
+  notes.unshift({
+
+    id:Date.now(),
+
+    text:text,
+
+    createdAt:
+      new Date().toISOString(),
+
+    handled:false
+
+  });
+
+  saveNotes(notes);
+
+  $("distractionInput").value = "";
+
+  renderNotes();
+
+  toast(
+    randomItem(parkedMessages)
+  );
+
+}
+
+
+/* ==============================
+   NOTES
+============================== */
+
+function renderNotes(){
+
+  const notes =
+    getNotes()
+      .filter(
+        note => !note.handled
+      );
+
+  $("noteCount").textContent =
+    notes.length +
+    (
+      notes.length === 1
+        ? " note"
+        : " notes"
+    );
+
+  if(!notes.length){
+
+    $("notes").innerHTML = `
+      <div class="empty">
+        Nothing parked here.<br>
+        You're cooking 🔥
+      </div>
+    `;
+
+    return;
+
+  }
+
+  $("notes").innerHTML =
+    notes.map(note => {
+
+      const text =
+        escapeHTML(note.text);
+
+      const link =
+        isURL(note.text)
+          ? `
+            <a
+              class="note-link"
+              href="${escapeHTML(note.text)}"
+              target="_blank"
+              rel="noopener"
+            >
+              Open link →
+            </a>
+          `
+          : "";
+
+      return `
+        <article class="note">
+
+          <small>
+            Dear future me —
+          </small>
+
+          <div class="note-text">
+            ${text}
+          </div>
+
+          ${link}
+
+          <div class="note-actions">
+
+            <button
+              onclick="openNote(${note.id})"
+            >
+              Open
+            </button>
+
+            <button
+              onclick="handleNote(${note.id})"
+            >
+              Handled ✓
+            </button>
+
+          </div>
+
+        </article>
+      `;
+
+    }).join("");
+
+}
+
+
+function openNote(id){
+
+  const note =
+    getNotes()
+      .find(
+        n => n.id === id
+      );
+
+  if(!note) return;
+
+  if(isURL(note.text)){
+
+    window.open(
+      note.text.trim(),
+      "_blank",
+      "noopener"
+    );
+
+  }else{
+
+    toast(
+      "Your note: " + note.text
+    );
+
+  }
+
+}
+
+
+function handleNote(id){
+
+  const notes =
+    getNotes();
+
+  const note =
+    notes.find(
+      n => n.id === id
+    );
+
+  if(note){
+
+    note.handled = true;
+
+  }
+
+  saveNotes(notes);
+
+  renderNotes();
+
+  toast(
+    "Handled. Nice 😎"
+  );
+
+}
+
+
+/* ==============================
+   HOME
+============================== */
+
+function goHome(){
+
+  clearInterval(timerId);
+
+  timerRunning = false;
+
+  timerPaused = false;
+
+  renderNotes();
+
+  showScreen("home");
+
+}
+
+
+/* ==============================
+   WEBVIEW BACKGROUND DETECTION
+============================== */
+
+document.addEventListener(
+  "visibilitychange",
+  () => {
+
+    if(document.hidden){
+
+      if(timerRunning){
+
+        appWasHidden = true;
+
+      }
+
+    }else{
+
+      if(appWasHidden){
+
+        appWasHidden = false;
+
+        updateTimer();
+
+        toast(
+          randomItem(backgroundMessages)
+        );
+
+      }
+
+    }
+
+  }
+);
+
+
+/* ==============================
+   ANDROID BACK / LIFECYCLE BRIDGE
+   Optional native Android side can
+   call these functions when the
+   WebView Activity changes state.
+============================== */
+
+window.LaterApp = {
+
+  onAppBackground(){
+
+    if(timerRunning){
+
+      appWasHidden = true;
+
+    }
+
+  },
+
+  onAppForeground(){
+
+    if(appWasHidden){
+
+      appWasHidden = false;
+
+      updateTimer();
+
+      toast(
+        randomItem(backgroundMessages)
+      );
+
+    }
+
+  }
+
+};
+
+
+/* ==============================
+   TOAST
+============================== */
+
+let toastTimer = null;
+
+function toast(message){
+
+  const el =
+    $("toast");
+
+  el.textContent =
+    message;
+
+  el.classList.add("show");
+
+  clearTimeout(toastTimer);
+
+  toastTimer =
+    setTimeout(
+      () => {
+        el.classList.remove("show");
+      },
+      2200
+    );
+
+}
+
+</script>
+
+</body>
+</html>
