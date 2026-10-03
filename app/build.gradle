@@ -1,0 +1,21 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.spaila.webview'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'com.spaila.webview'
+        minSdk 24
+        targetSdk 36
+        versionCode 1
+        versionName '0.1'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
