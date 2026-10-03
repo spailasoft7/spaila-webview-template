@@ -28,6 +28,7 @@
   <p id="message">Not clicked yet</p>
   <button id="tapBtn">Tap me</button>
   <button id="bridgeBtn">Test bridge</button>
+  <button id="notifBtn">Test notification</button>
 
   <script src="spaila.js"></script>
   <script>
@@ -36,6 +37,9 @@
     });
     document.getElementById("bridgeBtn").addEventListener("click", function () {
       Spaila.toast("Hello from JavaScript!");
+    });
+    document.getElementById("notifBtn").addEventListener("click", function () {
+      Spaila.showNotification("Spaila", "This notification came from JavaScript!");
     });
   </script>
 </body>

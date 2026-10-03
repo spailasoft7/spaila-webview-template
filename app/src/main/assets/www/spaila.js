@@ -11,6 +11,9 @@
   window.Spaila = {
     toast: function (text) {
       send("toast", [String(text)]);
+    },
+    showNotification: function (title, message) {
+      send("showNotification", [String(title), String(message)]);
     }
   };
 })();
