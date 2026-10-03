@@ -3,15 +3,16 @@ plugins {
 }
 
 android {
-    namespace 'com.spaila.webview'
+    namespace 'com.spaila.webview'   // code package: leave as it is
     compileSdk 36
 
     defaultConfig {
-        applicationId 'com.spaila.webview'
+        applicationId 'com.spaila.later'   // the app's permanent ID on phones and Google Play
         minSdk 24
         targetSdk 36
-        versionCode 1
-        versionName '0.1'
+        // GitHub gives every build a higher number, which Google Play requires
+        versionCode Integer.parseInt(System.getenv("GITHUB_RUN_NUMBER") ?: "1")
+        versionName '1.0.0'
     }
 
     compileOptions {
