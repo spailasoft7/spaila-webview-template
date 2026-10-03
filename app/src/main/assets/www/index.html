@@ -1184,6 +1184,24 @@ document.addEventListener(
    WebView Activity changes state.
 ============================== */
 
+/* Android Back button: go Home from the timer screen */
+window.onSpailaBack = function(){
+
+  const work = document.getElementById("work");
+
+  if(work && work.classList.contains("active")){
+
+    goHome();
+
+    return true;
+
+  }
+
+  return false;
+
+};
+
+
 window.LaterApp = {
 
   onAppBackground(){

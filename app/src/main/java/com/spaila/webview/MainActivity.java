@@ -6,17 +6,23 @@ import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Insets;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Message;
+import android.view.View;
+import android.view.WindowInsets;
+import android.view.WindowInsetsController;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.FrameLayout;
 import android.widget.Toast;
+import android.window.OnBackInvokedDispatcher;
 
 import androidx.webkit.WebMessageCompat;
 import androidx.webkit.WebViewAssetLoader;
@@ -33,8 +39,12 @@ import java.util.Set;
 
 public class MainActivity extends Activity {
 
-    private static final String ORIGIN = "https://appassets.androidplatform.net";
+    // ----- Per-app settings -----
     private static final String START_PAGE = "index.html";
+    private static final int BAR_COLOR = 0xFF0A1F4C; // status bar and bottom bar colour
+    // ----------------------------
+
+    private static final String ORIGIN = "https://appassets.androidplatform.net";
     private static final int REQ_NOTIFICATIONS = 1001;
 
     private WebView webView;
@@ -46,7 +56,16 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
 
         webView = new WebView(this);
-        setContentView(webView);
+
+        FrameLayout root = new FrameLayout(this);
+        root.setBackgroundColor(BAR_COLOR);
+        root.addView(webView, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT));
+        setContentView(root);
+
+        setupSystemBars(root);
+        setupBackHandling();
 
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
@@ -97,6 +116,75 @@ public class MainActivity extends Activity {
         setupSpailaBridge();
 
         webView.loadUrl(ORIGIN + "/assets/www/" + START_PAGE);
+    }
+
+    // ---------- System bars (status bar and bottom bar) ----------
+
+    private void setupSystemBars(FrameLayout root) {
+        // Colours: used on Android 14 and older. On 15+ the root's navy background shows through.
+        getWindow().setStatusBarColor(BAR_COLOR);
+        getWindow().setNavigationBarColor(BAR_COLOR);
+
+        // Light icons (white clock, battery) because the bars are dark.
+        if (Build.VERSION.SDK_INT >= 30) {
+            WindowInsetsController controller = getWindow().getInsetsController();
+            if (controller != null) {
+                controller.setSystemBarsAppearance(0,
+                        WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
+                                | WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS);
+            }
+        } else {
+            View decor = getWindow().getDecorView();
+            int flags = decor.getSystemUiVisibility();
+            flags &= ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+            flags &= ~View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+            decor.setSystemUiVisibility(flags);
+        }
+
+        // Keep the page away from the bars and the keyboard.
+        root.setOnApplyWindowInsetsListener((v, insets) -> {
+            int left, top, right, bottom;
+            if (Build.VERSION.SDK_INT >= 30) {
+                Insets i = insets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.ime());
+                left = i.left;
+                top = i.top;
+                right = i.right;
+                bottom = i.bottom;
+            } else {
+                left = insets.getSystemWindowInsetLeft();
+                top = insets.getSystemWindowInsetTop();
+                right = insets.getSystemWindowInsetRight();
+                bottom = insets.getSystemWindowInsetBottom();
+            }
+            v.setPadding(left, top, right, bottom);
+            return insets;
+        });
+    }
+
+    // ---------- Back button ----------
+
+    private void setupBackHandling() {
+        if (Build.VERSION.SDK_INT >= 33) {
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                    OnBackInvokedDispatcher.PRIORITY_DEFAULT, this::handleBack);
+        }
+    }
+
+    // Used on Android 12 and older.
+    @Override
+    public void onBackPressed() {
+        handleBack();
+    }
+
+    // Ask the page first. If it doesn't handle Back, send the app to the background.
+    private void handleBack() {
+        webView.evaluateJavascript(
+                "(function(){try{return !!(window.onSpailaBack && window.onSpailaBack());}catch(e){return false;}})()",
+                value -> {
+                    if (!"true".equals(value)) {
+                        moveTaskToBack(true);
+                    }
+                });
     }
 
     private void openInBrowser(Uri uri) {
