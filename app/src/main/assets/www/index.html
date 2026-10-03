@@ -210,6 +210,7 @@
 ></div>
 
 
+<script src="spaila.js"></script>
 <script>
 
 /* ==============================
@@ -471,11 +472,11 @@ function sendNativeNotification(
   try{
 
     if(
-      window.AndroidAPI &&
-      typeof AndroidAPI.showNotification === "function"
+      window.Spaila &&
+      typeof Spaila.showNotification === "function"
     ){
 
-      AndroidAPI.showNotification(
+      Spaila.showNotification(
         title,
         message
       );
