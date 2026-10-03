@@ -15,6 +15,7 @@
     button {
       font-size: 18px;
       padding: 14px 28px;
+      margin: 8px;
       border: none;
       border-radius: 12px;
       background: #22c55e;
@@ -26,10 +27,15 @@
   <h1>Spaila WebView works</h1>
   <p id="message">Not clicked yet</p>
   <button id="tapBtn">Tap me</button>
+  <button id="bridgeBtn">Test bridge</button>
 
+  <script src="spaila.js"></script>
   <script>
     document.getElementById("tapBtn").addEventListener("click", function () {
       document.getElementById("message").textContent = "It works!";
+    });
+    document.getElementById("bridgeBtn").addEventListener("click", function () {
+      Spaila.toast("Hello from JavaScript!");
     });
   </script>
 </body>
