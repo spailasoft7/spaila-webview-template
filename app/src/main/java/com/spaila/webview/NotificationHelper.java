@@ -11,6 +11,7 @@ import android.os.Build;
 public class NotificationHelper {
 
     static final String CHANNEL_ID = "spaila_default";
+    static final int ACCENT_COLOR = 0xFF1F51FF; // colour of the icon in the notification shade
 
     static void show(Context context, String title, String message) {
         NotificationManager manager = context.getSystemService(NotificationManager.class);
@@ -29,7 +30,8 @@ public class NotificationHelper {
                 ? new Notification.Builder(context, CHANNEL_ID)
                 : new Notification.Builder(context);
 
-        builder.setSmallIcon(android.R.drawable.ic_dialog_info)
+        builder.setSmallIcon(R.drawable.ic_stat_notify)
+                .setColor(ACCENT_COLOR)
                 .setContentTitle(title)
                 .setContentText(message)
                 .setContentIntent(tapAction)

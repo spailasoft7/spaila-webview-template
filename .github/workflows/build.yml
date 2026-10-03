@@ -11,6 +11,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Make icons from branding/icon.png
+        run: |
+          pip install pillow
+          python tools/make_icons.py
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
