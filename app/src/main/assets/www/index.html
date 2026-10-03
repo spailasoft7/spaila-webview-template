@@ -499,6 +499,83 @@ function sendNativeNotification(
    START WORK
 ============================== */
 
+/* ==============================
+   SCHEDULED 5-MINUTE ALERT (Spaila)
+============================== */
+
+const FIVE_MIN_ALARM_ID = 5001;
+
+function cancelFiveMinuteAlarm(){
+
+  try{
+
+    if(window.Spaila){
+
+      Spaila.cancelScheduledNotification(
+        FIVE_MIN_ALARM_ID
+      );
+
+    }
+
+  }catch(e){}
+
+}
+
+
+function syncFiveMinuteAlarm(){
+
+  if(!window.Spaila) return;
+
+  if(
+    mode === "countdown" &&
+    timerRunning &&
+    !timerPaused
+  ){
+
+    const seconds = Math.max(
+      1,
+      Math.round(
+        (countdownEnd - Date.now()) / 1000
+      )
+    );
+
+    Spaila.scheduleNotification(
+      FIVE_MIN_ALARM_ID,
+      "Later",
+      "Your 5 minutes are done.",
+      seconds
+    );
+
+    showSwipeTipOnce();
+
+  }else{
+
+    cancelFiveMinuteAlarm();
+
+  }
+
+}
+
+
+function showSwipeTipOnce(){
+
+  try{
+
+    if(!window.SpailaNative) return;
+
+    if(localStorage.getItem("later_swipe_tip_v1")) return;
+
+    localStorage.setItem("later_swipe_tip_v1","1");
+
+    toast(
+      "Tip: don't swipe Later away or the alert won't ring."
+    );
+
+  }catch(e){}
+
+}
+
+
 function startWork(){
 
   const task =
@@ -552,6 +629,8 @@ function startWork(){
       "Stopwatch running.";
 
   }
+
+  syncFiveMinuteAlarm();
 
   showScreen("work");
 
@@ -617,10 +696,7 @@ function updateTimer(){
       $("pauseBtn").textContent =
         "Start again";
 
-      sendNativeNotification(
-        "Later",
-        "Your 5 minutes are done."
-      );
+      /* The "5 minutes done" alert now comes from the scheduled alarm. */
 
       toast(
         "Five minutes done 😎"
@@ -748,6 +824,8 @@ function togglePause(){
     $("timerStatus").textContent =
       "Five minutes. Let's go.";
 
+    syncFiveMinuteAlarm();
+
     clearInterval(timerId);
 
     timerId =
@@ -765,6 +843,8 @@ function togglePause(){
 
     timerPaused = true;
 
+    cancelFiveMinuteAlarm();
+
     pauseStarted =
       Date.now();
 
@@ -775,6 +855,8 @@ function togglePause(){
       "Paused 😌";
 
   }else{
+
+    countdownEnd += Date.now() - pauseStarted;
 
     pausedTotal +=
       Date.now() -
@@ -792,6 +874,8 @@ function togglePause(){
         ? "Keep going."
         : "Stopwatch running.";
 
+    syncFiveMinuteAlarm();
+
   }
 
 }
@@ -802,6 +886,8 @@ function togglePause(){
 ============================== */
 
 function finishWork(){
+
+  cancelFiveMinuteAlarm();
 
   clearInterval(timerId);
 
@@ -1039,6 +1125,8 @@ function handleNote(id){
 ============================== */
 
 function goHome(){
+
+  cancelFiveMinuteAlarm();
 
   clearInterval(timerId);
 

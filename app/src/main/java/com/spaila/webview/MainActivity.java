@@ -26,17 +26,20 @@ import androidx.webkit.WebViewFeature;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 
 public class MainActivity extends Activity {
 
     private static final String ORIGIN = "https://appassets.androidplatform.net";
-    private static final String START_PAGE = "bridge-test.html";
+    private static final String START_PAGE = "index.html";
     private static final int REQ_NOTIFICATIONS = 1001;
 
     private WebView webView;
-    private Runnable pendingAction;
+    private final List<Runnable> pendingActions = new ArrayList<>();
+    private boolean permissionRequestInFlight = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -138,8 +141,9 @@ public class MainActivity extends Activity {
                 final int id = args.getInt(0);
                 final String title = args.getString(1);
                 final String text = args.getString(2);
-                final long seconds = args.getLong(3);
-                withNotificationPermission(() -> scheduleNotification(id, title, text, seconds));
+                // The alarm time is fixed now, even if the permission popup takes a while.
+                final long triggerAt = System.currentTimeMillis() + args.getLong(3) * 1000L;
+                withNotificationPermission(() -> scheduleNotification(id, title, text, triggerAt));
 
             } else if (fn.equals("cancelScheduledNotification")) {
                 cancelScheduledNotification(args.getInt(0));
@@ -151,13 +155,17 @@ public class MainActivity extends Activity {
 
     // ---------- Notification permission ----------
 
-    // Runs the action now if allowed, otherwise asks first and runs it if the user says yes.
+    // Runs the action now if allowed. Otherwise it waits, asks once, and runs
+    // everything that is waiting if the user says yes.
     private void withNotificationPermission(Runnable action) {
         if (Build.VERSION.SDK_INT >= 33
                 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED) {
-            pendingAction = action;
-            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQ_NOTIFICATIONS);
+            pendingActions.add(action);
+            if (!permissionRequestInFlight) {
+                permissionRequestInFlight = true;
+                requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQ_NOTIFICATIONS);
+            }
             return;
         }
         action.run();
@@ -167,14 +175,20 @@ public class MainActivity extends Activity {
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == REQ_NOTIFICATIONS) {
+            permissionRequestInFlight = false;
             boolean granted = grantResults.length > 0
                     && grantResults[0] == PackageManager.PERMISSION_GRANTED;
-            if (granted && pendingAction != null) {
-                pendingAction.run();
-            } else if (!granted) {
+
+            List<Runnable> toRun = new ArrayList<>(pendingActions);
+            pendingActions.clear();
+
+            if (granted) {
+                for (Runnable action : toRun) {
+                    action.run();
+                }
+            } else {
                 Toast.makeText(this, "Notifications are turned off for this app", Toast.LENGTH_LONG).show();
             }
-            pendingAction = null;
         }
     }
 
@@ -187,10 +201,9 @@ public class MainActivity extends Activity {
         return PendingIntent.getBroadcast(this, id, intent, flags | PendingIntent.FLAG_IMMUTABLE);
     }
 
-    private void scheduleNotification(int id, String title, String message, long seconds) {
+    private void scheduleNotification(int id, String title, String message, long triggerAt) {
         AlarmManager alarmManager = getSystemService(AlarmManager.class);
         PendingIntent pending = alarmIntent(id, title, message, PendingIntent.FLAG_UPDATE_CURRENT);
-        long triggerAt = System.currentTimeMillis() + seconds * 1000L;
         alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pending);
     }
 
