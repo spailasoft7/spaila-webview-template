@@ -9,3 +9,8 @@ app/src/main/res/drawable-nodpi/splash_icon.png
 build/
 .gradle/
 local.properties
+
+# Signing keys: NEVER commit these
+keys/
+*.jks
+*.keystore
