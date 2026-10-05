@@ -10,8 +10,11 @@ import android.graphics.Insets;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.Message;
 import android.view.View;
+import android.view.ViewTreeObserver;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.webkit.WebChromeClient;
@@ -42,6 +45,7 @@ public class MainActivity extends Activity {
     // ----- Per-app settings -----
     private static final String START_PAGE = "index.html";
     private static final int BAR_COLOR = 0xFF0A1F4C; // status bar and bottom bar colour
+    private static final int SPLASH_MAX_MS = 10000;   // the splash never stays longer than this
     // ----------------------------
 
     private static final String ORIGIN = "https://appassets.androidplatform.net";
@@ -50,6 +54,7 @@ public class MainActivity extends Activity {
     private WebView webView;
     private final List<Runnable> pendingActions = new ArrayList<>();
     private boolean permissionRequestInFlight = false;
+    private boolean pageReady = false; // true once the page has loaded (or the time limit passed)
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -63,6 +68,11 @@ public class MainActivity extends Activity {
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT));
         setContentView(root);
+
+        // The WebView is white by default. Make it navy so nothing white can flash.
+        webView.setBackgroundColor(BAR_COLOR);
+
+        holdSplashUntilReady();
 
         setupSystemBars(root);
         setupBackHandling();
@@ -80,6 +90,11 @@ public class MainActivity extends Activity {
             @Override
             public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
                 return assetLoader.shouldInterceptRequest(request.getUrl());
+            }
+
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                markPageReady();
             }
 
             @Override
@@ -118,10 +133,35 @@ public class MainActivity extends Activity {
         webView.loadUrl(ORIGIN + "/assets/www/" + START_PAGE);
     }
 
+    // ---------- Splash screen ----------
+
+    // Android keeps showing the splash until the app draws its first frame.
+    // So we refuse to draw until the page is ready, or until SPLASH_MAX_MS passes.
+    private void holdSplashUntilReady() {
+        final View content = findViewById(android.R.id.content);
+        content.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+            @Override
+            public boolean onPreDraw() {
+                if (pageReady) {
+                    content.getViewTreeObserver().removeOnPreDrawListener(this);
+                    return true;  // ready: draw now, the splash goes away
+                }
+                return false;     // not ready: skip drawing, the splash stays
+            }
+        });
+
+        // Safety net: never get stuck on the splash forever.
+        new Handler(Looper.getMainLooper()).postDelayed(this::markPageReady, SPLASH_MAX_MS);
+    }
+
+    private void markPageReady() {
+        pageReady = true;
+    }
+
     // ---------- System bars (status bar and bottom bar) ----------
 
     private void setupSystemBars(FrameLayout root) {
-        // Colours: used on Android 14 and older. On 15+ the root's navy background shows through.
+        // Colours: used on Angit add -A && git commit -m "Hold splash until page loads" && git pushdroid 14 and older. On 15+ the root's navy background shows through.
         getWindow().setStatusBarColor(BAR_COLOR);
         getWindow().setNavigationBarColor(BAR_COLOR);
 
