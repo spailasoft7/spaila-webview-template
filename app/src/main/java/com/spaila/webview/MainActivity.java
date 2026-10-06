@@ -161,7 +161,7 @@ public class MainActivity extends Activity {
     // ---------- System bars (status bar and bottom bar) ----------
 
     private void setupSystemBars(FrameLayout root) {
-        // Colours: used on Angit add -A && git commit -m "Hold splash until page loads" && git pushdroid 14 and older. On 15+ the root's navy background shows through.
+        // Colours: used on Android 14 and older. On 15+ the root's navy background shows through.
         getWindow().setStatusBarColor(BAR_COLOR);
         getWindow().setNavigationBarColor(BAR_COLOR);
 
