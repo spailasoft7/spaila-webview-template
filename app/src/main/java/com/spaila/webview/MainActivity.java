@@ -42,9 +42,9 @@ import java.util.Set;
 
 public class MainActivity extends Activity {
 
-    // ----- Per-app settings -----
-    private static final String START_PAGE = "index.html";
-    private static final int BAR_COLOR = 0xFF0A1F4C; // status bar and bottom bar colour
+    // ----- Per-app settings (they come from app.properties) -----
+    private static final String START_PAGE = BuildConfig.START_PAGE;
+    private static final int BAR_COLOR = BuildConfig.BAR_COLOR; // status bar and bottom bar colour
     private static final int SPLASH_MAX_MS = 10000;   // the splash never stays longer than this
     // ----------------------------
 
